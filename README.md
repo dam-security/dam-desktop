@@ -193,9 +193,7 @@ This project is proprietary software. See LICENSE file for details.
 ## Support
 
 For technical support and enterprise inquiries:
-- Email: support@dam.ai
-- Documentation: https://docs.dam.ai
-- Enterprise Sales: sales@dam.ai
+- Email: support@trydam.io
 
 ## Roadmap
 
