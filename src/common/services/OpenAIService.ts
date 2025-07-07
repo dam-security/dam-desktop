@@ -23,7 +23,8 @@ export class OpenAIService {
   private baseURL: string = 'https://api.openai.com/v1/chat/completions';
 
   private constructor() {
-    this.apiKey = process.env.OPENAI_API_KEY || '';
+    // Get API key from exposed environment variables
+    this.apiKey = (window as any).electronAPI?.env?.OPENAI_API_KEY || '';
     if (!this.apiKey) {
       console.warn('OpenAI API key not found. Please set OPENAI_API_KEY environment variable.');
     }

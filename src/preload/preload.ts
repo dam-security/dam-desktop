@@ -3,6 +3,13 @@ import { contextBridge, ipcRenderer } from 'electron';
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Environment variables (safely exposed)
+  env: {
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+    CLAUDE_API_KEY: process.env.CLAUDE_API_KEY || '',
+    LOG_LEVEL: process.env.LOG_LEVEL || 'info'
+  },
+  
   // Window controls
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
@@ -43,6 +50,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 declare global {
   interface Window {
     electronAPI: {
+      env: {
+        OPENAI_API_KEY: string;
+        CLAUDE_API_KEY: string;
+        LOG_LEVEL: string;
+      };
       minimizeWindow: () => Promise<void>;
       maximizeWindow: () => Promise<void>;
       closeWindow: () => Promise<void>;

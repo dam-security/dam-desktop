@@ -24,7 +24,8 @@ export class ClaudeAPIService {
   private baseURL: string = 'https://api.anthropic.com/v1/messages';
 
   private constructor() {
-    this.apiKey = process.env.CLAUDE_API_KEY || '';
+    // Get API key from exposed environment variables
+    this.apiKey = (window as any).electronAPI?.env?.CLAUDE_API_KEY || '';
     if (!this.apiKey) {
       console.warn('Claude API key not found. Please set CLAUDE_API_KEY environment variable.');
     }
