@@ -22,6 +22,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Database operations
   dbQuery: (query: string, params?: any[]) => ipcRenderer.invoke('db:query', query, params),
   
+  // API Key management (secure storage)
+  setAPIKey: (service: string, key: string) => ipcRenderer.invoke('apikey:set', service, key),
+  getAPIKey: (service: string) => ipcRenderer.invoke('apikey:get', service),
+  clearAPIKey: (service: string) => ipcRenderer.invoke('apikey:clear', service),
+  
   // Monitoring controls
   startMonitoring: () => ipcRenderer.invoke('monitoring:start'),
   stopMonitoring: () => ipcRenderer.invoke('monitoring:stop'),
@@ -61,6 +66,9 @@ declare global {
       quitApp: () => Promise<void>;
       getVersion: () => Promise<string>;
       dbQuery: (query: string, params?: any[]) => Promise<any>;
+      setAPIKey: (service: string, key: string) => Promise<void>;
+      getAPIKey: (service: string) => Promise<string>;
+      clearAPIKey: (service: string) => Promise<void>;
       startMonitoring: () => Promise<void>;
       stopMonitoring: () => Promise<void>;
       getMonitoringStatus: () => Promise<any>;

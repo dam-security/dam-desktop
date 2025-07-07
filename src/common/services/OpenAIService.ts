@@ -23,10 +23,46 @@ export class OpenAIService {
   private baseURL: string = 'https://api.openai.com/v1/chat/completions';
 
   private constructor() {
-    // Get API key from exposed environment variables
-    this.apiKey = (window as any).electronAPI?.env?.OPENAI_API_KEY || '';
-    if (!this.apiKey) {
-      console.warn('OpenAI API key not found. Please set OPENAI_API_KEY environment variable.');
+    // Initialize with empty key - will be loaded when needed
+    this.apiKey = '';
+    this.loadAPIKey();
+  }
+
+  private async loadAPIKey() {
+    try {
+      console.log('Loading OpenAI API key...');
+      
+      // Check if electronAPI is available
+      if (!(window as any).electronAPI) {
+        console.error('electronAPI not available');
+        return;
+      }
+      
+      // Try to get stored API key first
+      console.log('Attempting to get stored OpenAI API key...');
+      const storedKey = await (window as any).electronAPI.getAPIKey('openai');
+      console.log('Stored OpenAI key result:', storedKey ? `Found key (${storedKey.length} chars)` : 'No stored key');
+      
+      if (storedKey && storedKey.trim() && storedKey.length > 10) {
+        this.apiKey = storedKey;
+        console.log('Using stored OpenAI API key:', this.apiKey.substring(0, 10) + '...');
+        return;
+      }
+      
+      // Fallback to environment variable
+      console.log('Checking OpenAI environment variable...');
+      const envKey = (window as any).electronAPI?.env?.OPENAI_API_KEY;
+      console.log('Environment OpenAI key result:', envKey ? 'Found env key' : 'No env key');
+      
+      if (envKey) {
+        this.apiKey = envKey;
+        console.log('Using environment OpenAI API key');
+        return;
+      }
+      
+      console.warn('OpenAI API key not found. Please configure it in Settings.');
+    } catch (error) {
+      console.error('Failed to load OpenAI API key:', error);
     }
   }
 
@@ -37,12 +73,25 @@ export class OpenAIService {
     return OpenAIService.instance;
   }
 
+  public async refreshAPIKey(): Promise<void> {
+    await this.loadAPIKey();
+  }
+
   public async sendMessage(
     messages: OpenAIMessage[],
     model: string = 'gpt-3.5-turbo',
     maxTokens: number = 2000
   ): Promise<string> {
     try {
+      // Ensure API key is loaded
+      if (!this.apiKey) {
+        await this.loadAPIKey();
+      }
+      
+      if (!this.apiKey) {
+        throw new Error('OpenAI API key not configured. Please add your API key in Settings.');
+      }
+      
       console.log('Sending message to OpenAI API');
       
       const requestBody = {

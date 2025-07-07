@@ -449,10 +449,26 @@ const HomeView: React.FC<{
       setChatHistory(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Failed to get response:', error);
+      
+      // Show more specific error messages
+      let errorContent = 'I apologize, but I encountered an issue processing your request. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('API key not configured')) {
+          errorContent = 'Please configure your Claude API key in Settings to use the chat feature.';
+        } else if (error.message.includes('API key') || error.message.includes('401')) {
+          errorContent = 'Your API key appears to be invalid. Please check your Claude API key in Settings.';
+        } else if (error.message.includes('429')) {
+          errorContent = 'Rate limit exceeded. Please wait a moment before trying again.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorContent = 'Network error. Please check your internet connection and try again.';
+        }
+      }
+      
       const errorMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant' as const,
-        content: 'I apologize, but I encountered an issue processing your request. Please try again.',
+        content: errorContent,
         timestamp: new Date()
       };
       setChatHistory(prev => [...prev, errorMessage]);
@@ -2131,9 +2147,86 @@ const SettingsView: React.FC<{
   toggleTheme: () => void; 
 }> = ({ userProfile, onSave, theme, darkMode, toggleTheme }) => {
   const [profile, setProfile] = useState(userProfile);
+  const [openaiKey, setOpenaiKey] = useState('');
+  const [claudeKey, setClaudeKey] = useState('');
+  const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+  const [showClaudeKey, setShowClaudeKey] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
 
-  const handleSave = () => {
-    onSave(profile);
+  useEffect(() => {
+    // Load existing API keys (masked)
+    const loadAPIKeys = async () => {
+      try {
+        const existingOpenaiKey = await (window as any).electronAPI?.getAPIKey('openai') || '';
+        const existingClaudeKey = await (window as any).electronAPI?.getAPIKey('claude') || '';
+        
+        // Show masked version if keys exist
+        setOpenaiKey(existingOpenaiKey ? '••••••••••••••••••••••••••••••••' : '');
+        setClaudeKey(existingClaudeKey ? '••••••••••••••••••••••••••••••••' : '');
+      } catch (error) {
+        console.error('Failed to load API keys:', error);
+      }
+    };
+    
+    loadAPIKeys();
+  }, []);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveMessage('');
+    
+    try {
+      // Save profile
+      onSave(profile);
+      
+      // Save API keys if they've been changed (not masked)
+      if (openaiKey && !openaiKey.includes('••')) {
+        await (window as any).electronAPI?.setAPIKey('openai', openaiKey);
+        // Refresh the OpenAI service to use the new key
+        const openAI = OpenAIService.getInstance();
+        await openAI.refreshAPIKey();
+      }
+      
+      if (claudeKey && !claudeKey.includes('••')) {
+        await (window as any).electronAPI?.setAPIKey('claude', claudeKey);
+        // Refresh the Claude service to use the new key
+        const claude = ClaudeAPIService.getInstance();
+        await claude.refreshAPIKey();
+      }
+      
+      setSaveMessage('Settings saved successfully!');
+      
+      // Mask the keys again after saving
+      if (openaiKey && !openaiKey.includes('••')) {
+        setOpenaiKey('••••••••••••••••••••••••••••••••');
+      }
+      if (claudeKey && !claudeKey.includes('••')) {
+        setClaudeKey('••••••••••••••••••••••••••••••••');
+      }
+      
+      setTimeout(() => setSaveMessage(''), 3000);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      setSaveMessage('Error saving settings. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClearAPIKey = async (service: 'openai' | 'claude') => {
+    try {
+      await (window as any).electronAPI?.clearAPIKey(service);
+      if (service === 'openai') {
+        setOpenaiKey('');
+      } else {
+        setClaudeKey('');
+      }
+      setSaveMessage(`${service === 'openai' ? 'OpenAI' : 'Claude'} API key cleared.`);
+      setTimeout(() => setSaveMessage(''), 3000);
+    } catch (error) {
+      console.error(`Failed to clear ${service} API key:`, error);
+    }
   };
 
   return (
@@ -2200,38 +2293,251 @@ const SettingsView: React.FC<{
         />
       </div>
 
-      <button
-        onClick={handleSave}
-        style={{
-          padding: '12px 24px',
-          background: theme.accent,
-          color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          fontSize: '14px',
-          fontWeight: '600',
-          marginRight: '12px'
-        }}
-      >
-        Save Changes
-      </button>
+      {/* API Keys Section */}
+      <div style={{ 
+        marginBottom: '32px', 
+        padding: '24px', 
+        background: theme.surface, 
+        borderRadius: '12px',
+        border: `1px solid ${theme.border}`
+      }}>
+        <h3 style={{ color: theme.text, marginBottom: '20px', fontSize: '18px', fontWeight: '600' }}>
+          API Configuration
+        </h3>
+        <p style={{ color: theme.textSecondary, marginBottom: '24px', fontSize: '14px' }}>
+          Configure your API keys to enable AI features. Keys are stored securely and never shared.
+        </p>
 
-      <button
-        onClick={toggleTheme}
-        style={{
-          padding: '12px 24px',
-          background: 'transparent',
-          color: theme.text,
-          border: `1px solid ${theme.border}`,
+        {/* OpenAI API Key */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', color: theme.text, marginBottom: '8px', fontWeight: '500' }}>
+            OpenAI API Key
+          </label>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type={showOpenaiKey ? "text" : "password"}
+              value={openaiKey}
+              onChange={(e) => setOpenaiKey(e.target.value)}
+              placeholder="sk-..."
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: `1px solid ${theme.inputBorder}`,
+                borderRadius: '8px',
+                background: theme.input,
+                color: theme.text,
+                fontSize: '14px'
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowOpenaiKey(!showOpenaiKey)}
+              style={{
+                padding: '12px 16px',
+                background: 'transparent',
+                color: theme.textSecondary,
+                border: `1px solid ${theme.inputBorder}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              {showOpenaiKey ? 'Hide' : 'Show'}
+            </button>
+            {openaiKey && (
+              <button
+                type="button"
+                onClick={() => handleClearAPIKey('openai')}
+                style={{
+                  padding: '12px 16px',
+                  background: 'transparent',
+                  color: '#dc3545',
+                  border: '1px solid #dc3545',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Claude API Key */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', color: theme.text, marginBottom: '8px', fontWeight: '500' }}>
+            Claude API Key
+          </label>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type={showClaudeKey ? "text" : "password"}
+              value={claudeKey}
+              onChange={(e) => setClaudeKey(e.target.value)}
+              placeholder="sk-ant-..."
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: `1px solid ${theme.inputBorder}`,
+                borderRadius: '8px',
+                background: theme.input,
+                color: theme.text,
+                fontSize: '14px'
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowClaudeKey(!showClaudeKey)}
+              style={{
+                padding: '12px 16px',
+                background: 'transparent',
+                color: theme.textSecondary,
+                border: `1px solid ${theme.inputBorder}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              {showClaudeKey ? 'Hide' : 'Show'}
+            </button>
+            {claudeKey && (
+              <button
+                type="button"
+                onClick={() => handleClearAPIKey('claude')}
+                style={{
+                  padding: '12px 16px',
+                  background: 'transparent',
+                  color: '#dc3545',
+                  border: '1px solid #dc3545',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div style={{ 
+          padding: '12px 16px', 
+          background: '#e3f2fd', 
+          color: '#1565c0', 
+          borderRadius: '8px', 
+          fontSize: '13px',
+          border: '1px solid #bbdefb'
+        }}>
+          <strong>💡 How to get API keys:</strong><br/>
+          • OpenAI: Visit <a href="https://platform.openai.com/api-keys" target="_blank" style={{color: '#1565c0'}}>platform.openai.com/api-keys</a><br/>
+          • Claude: Visit <a href="https://console.anthropic.com/" target="_blank" style={{color: '#1565c0'}}>console.anthropic.com</a>
+        </div>
+
+        {/* Test API Keys */}
+        <div style={{ marginTop: '16px', display: 'flex', gap: '12px' }}>
+          <button
+            onClick={async () => {
+              try {
+                const claude = ClaudeAPIService.getInstance();
+                await claude.refreshAPIKey();
+                const testResponse = await claude.sendMessage([{ role: 'user', content: 'Hello, just testing the connection.' }]);
+                setSaveMessage('✅ Claude API key is working!');
+              } catch (error) {
+                console.error('Claude test failed:', error);
+                setSaveMessage(`❌ Claude API test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              }
+              setTimeout(() => setSaveMessage(''), 5000);
+            }}
+            style={{
+              padding: '8px 16px',
+              background: 'transparent',
+              color: theme.accent,
+              border: `1px solid ${theme.accent}`,
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Test Claude
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const openai = OpenAIService.getInstance();
+                await openai.refreshAPIKey();
+                const testResponse = await openai.sendMessage([{ role: 'user', content: 'Hello, just testing the connection.' }]);
+                setSaveMessage('✅ OpenAI API key is working!');
+              } catch (error) {
+                console.error('OpenAI test failed:', error);
+                setSaveMessage(`❌ OpenAI API test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              }
+              setTimeout(() => setSaveMessage(''), 5000);
+            }}
+            style={{
+              padding: '8px 16px',
+              background: 'transparent',
+              color: theme.accent,
+              border: `1px solid ${theme.accent}`,
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Test OpenAI
+          </button>
+        </div>
+      </div>
+
+      {/* Save Status Message */}
+      {saveMessage && (
+        <div style={{
+          padding: '12px 16px',
+          marginBottom: '16px',
+          background: saveMessage.includes('Error') ? '#ffebee' : '#e8f5e8',
+          color: saveMessage.includes('Error') ? '#c62828' : '#2e7d32',
           borderRadius: '8px',
-          cursor: 'pointer',
           fontSize: '14px',
-          fontWeight: '600'
-        }}
-      >
-        {darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-      </button>
+          border: `1px solid ${saveMessage.includes('Error') ? '#ffcdd2' : '#c8e6c9'}`
+        }}>
+          {saveMessage}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          style={{
+            padding: '12px 24px',
+            background: isSaving ? theme.textSecondary : theme.accent,
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: isSaving ? 'not-allowed' : 'pointer',
+            fontSize: '14px',
+            fontWeight: '600',
+            opacity: isSaving ? 0.7 : 1
+          }}
+        >
+          {isSaving ? 'Saving...' : 'Save Changes'}
+        </button>
+
+        <button
+          onClick={toggleTheme}
+          style={{
+            padding: '12px 24px',
+            background: 'transparent',
+            color: theme.text,
+            border: `1px solid ${theme.border}`,
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '600'
+          }}
+        >
+          {darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        </button>
+      </div>
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, Tray, globalShortcut, nativeImage } from 'electron';
 import * as path from 'path';
+import Store from 'electron-store';
 import { DatabaseService } from '../common/services/DatabaseService';
 import { MonitoringService } from '../common/services/MonitoringService';
 import { ConfigService } from '../common/services/ConfigService';
@@ -21,12 +22,20 @@ class DAMDesktopApp {
   private monitoringService: MonitoringService;
   private configService: ConfigService;
   private logger: Logger;
+  private secureStore: Store;
 
   constructor() {
     this.logger = Logger.getInstance();
     this.configService = ConfigService.getInstance();
     this.databaseService = DatabaseService.getInstance();
     this.monitoringService = MonitoringService.getInstance();
+    
+    // Initialize secure store for API keys
+    this.secureStore = new Store({
+      name: 'dam-api-keys',
+      encryptionKey: 'dam-desktop-secure-key',
+      clearInvalidConfig: true
+    });
     
     this.initializeApp();
   }
@@ -271,6 +280,39 @@ class DAMDesktopApp {
 
     ipcMain.handle('monitoring:status', () => {
       return this.monitoringService.getStatus();
+    });
+
+    // API Key management
+    ipcMain.handle('apikey:set', (event, service: string, key: string) => {
+      try {
+        this.secureStore.set(`apikey.${service}`, key);
+        this.logger.info(`API key for ${service} stored securely`);
+        return true;
+      } catch (error) {
+        this.logger.error(`Failed to store API key for ${service}:`, error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('apikey:get', (event, service: string) => {
+      try {
+        const key = this.secureStore.get(`apikey.${service}`, '');
+        return key;
+      } catch (error) {
+        this.logger.error(`Failed to retrieve API key for ${service}:`, error);
+        return '';
+      }
+    });
+
+    ipcMain.handle('apikey:clear', (event, service: string) => {
+      try {
+        this.secureStore.delete(`apikey.${service}`);
+        this.logger.info(`API key for ${service} cleared`);
+        return true;
+      } catch (error) {
+        this.logger.error(`Failed to clear API key for ${service}:`, error);
+        throw error;
+      }
     });
   }
 

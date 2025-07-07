@@ -24,10 +24,46 @@ export class ClaudeAPIService {
   private baseURL: string = 'https://api.anthropic.com/v1/messages';
 
   private constructor() {
-    // Get API key from exposed environment variables
-    this.apiKey = (window as any).electronAPI?.env?.CLAUDE_API_KEY || '';
-    if (!this.apiKey) {
-      console.warn('Claude API key not found. Please set CLAUDE_API_KEY environment variable.');
+    // Initialize with empty key - will be loaded when needed
+    this.apiKey = '';
+    this.loadAPIKey();
+  }
+
+  private async loadAPIKey() {
+    try {
+      console.log('Loading Claude API key...');
+      
+      // Check if electronAPI is available
+      if (!(window as any).electronAPI) {
+        console.error('electronAPI not available');
+        return;
+      }
+      
+      // Try to get stored API key first
+      console.log('Attempting to get stored API key...');
+      const storedKey = await (window as any).electronAPI.getAPIKey('claude');
+      console.log('Stored key result:', storedKey ? `Found key (${storedKey.length} chars)` : 'No stored key');
+      
+      if (storedKey && storedKey.trim() && storedKey.length > 10) {
+        this.apiKey = storedKey;
+        console.log('Using stored API key:', this.apiKey.substring(0, 10) + '...');
+        return;
+      }
+      
+      // Fallback to environment variable
+      console.log('Checking environment variable...');
+      const envKey = (window as any).electronAPI?.env?.CLAUDE_API_KEY;
+      console.log('Environment key result:', envKey ? 'Found env key' : 'No env key');
+      
+      if (envKey) {
+        this.apiKey = envKey;
+        console.log('Using environment API key');
+        return;
+      }
+      
+      console.warn('Claude API key not found. Please configure it in Settings.');
+    } catch (error) {
+      console.error('Failed to load Claude API key:', error);
     }
   }
 
@@ -38,12 +74,27 @@ export class ClaudeAPIService {
     return ClaudeAPIService.instance;
   }
 
+  public async refreshAPIKey(): Promise<void> {
+    await this.loadAPIKey();
+  }
+
   public async sendMessage(
     messages: ClaudeMessage[],
     systemPrompt?: string
   ): Promise<string> {
     try {
-      console.log('Sending message to Claude API');
+      // Ensure API key is loaded
+      if (!this.apiKey) {
+        console.log('API key not found, loading...');
+        await this.loadAPIKey();
+      }
+      
+      if (!this.apiKey) {
+        console.error('Claude API key not configured after loading attempt');
+        throw new Error('Claude API key not configured. Please add your API key in Settings.');
+      }
+      
+      console.log('Sending message to Claude API with key:', this.apiKey.substring(0, 10) + '...');
       
       const requestBody = {
         model: 'claude-3-5-sonnet-20241022',
