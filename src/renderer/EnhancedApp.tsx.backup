@@ -1,0 +1,3053 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { SmartDamAssistant } from '../common/services/SmartDamAssistant';
+import { ClaudeAPIService } from '../common/services/ClaudeAPIService';
+
+interface UserProfile {
+  name: string;
+  email: string;
+  enterpriseUrl: string;
+  role: string;
+}
+
+interface Theme {
+  bg: string;
+  surface: string;
+  surfaceHover: string;
+  text: string;
+  textSecondary: string;
+  border: string;
+  accent: string;
+  accentHover: string;
+  input: string;
+  inputBorder: string;
+}
+
+export const EnhancedApp: React.FC = () => {
+  const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'training' | 'catalog' | 'settings'>('home');
+  const [darkMode, setDarkMode] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    name: '',
+    email: '',
+    enterpriseUrl: '',
+    role: ''
+  });
+
+  const damAssistant = SmartDamAssistant.getInstance();
+
+  useEffect(() => {
+    // Load user profile from localStorage
+    const saved = localStorage.getItem('damUserProfile');
+    if (saved) {
+      setUserProfile(JSON.parse(saved));
+    }
+    // Load theme preference
+    const savedTheme = localStorage.getItem('damTheme');
+    if (savedTheme === 'dark') {
+      setDarkMode(true);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = !darkMode;
+    setDarkMode(newTheme);
+    localStorage.setItem('damTheme', newTheme ? 'dark' : 'light');
+  };
+
+  const saveProfile = (profile: UserProfile) => {
+    setUserProfile(profile);
+    localStorage.setItem('damUserProfile', JSON.stringify(profile));
+  };
+
+  const theme: Theme = {
+    bg: darkMode ? '#0a0a0a' : '#ffffff',
+    surface: darkMode ? '#1a1a1a' : '#f8f9fa',
+    surfaceHover: darkMode ? '#262626' : '#e9ecef',
+    text: darkMode ? '#ffffff' : '#212529',
+    textSecondary: darkMode ? '#a0a0a0' : '#6c757d',
+    border: darkMode ? '#333333' : '#dee2e6',
+    accent: '#6366f1',
+    accentHover: '#4f46e5',
+    input: darkMode ? '#262626' : '#ffffff',
+    inputBorder: darkMode ? '#404040' : '#ced4da'
+  };
+
+  const renderView = () => {
+    switch (currentView) {
+      case 'home':
+        return <HomeView userProfile={userProfile} theme={theme} damAssistant={damAssistant} />;
+      case 'dashboard':
+        return <DashboardView theme={theme} />;
+      case 'training':
+        return <TrainingView theme={theme} damAssistant={damAssistant} />;
+      case 'catalog':
+        return <CatalogView theme={theme} damAssistant={damAssistant} />;
+      case 'settings':
+        return <SettingsView 
+          userProfile={userProfile} 
+          onSave={saveProfile} 
+          theme={theme} 
+          darkMode={darkMode} 
+          toggleTheme={toggleTheme} 
+        />;
+      default:
+        return <HomeView userProfile={userProfile} theme={theme} damAssistant={damAssistant} />;
+    }
+  };
+
+  return (
+    <div style={{
+      width: '100vw',
+      height: '100vh',
+      background: theme.bg,
+      display: 'flex',
+      position: 'relative',
+      color: theme.text,
+      transition: 'background 0.3s ease',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    }}>
+      {/* Window Controls Spacer */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        width: '100px',
+        height: '40px',
+        zIndex: 1000,
+        pointerEvents: 'none'
+      }} />
+
+      {/* Sidebar */}
+      <div style={{
+        width: '260px',
+        padding: '24px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        background: theme.surface,
+        borderRight: `1px solid ${theme.border}`
+      }}>
+        {/* Logo */}
+        <div style={{
+          padding: '16px',
+          textAlign: 'center',
+          marginBottom: '8px'
+        }}>
+          <h1 style={{ 
+            margin: 0, 
+            fontSize: '26px', 
+            fontWeight: '700',
+            letterSpacing: '-0.5px',
+            background: 'linear-gradient(45deg, #6366f1, #ec4899)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>
+            Dam
+          </h1>
+        </div>
+
+        {/* Main Navigation */}
+        <nav style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
+          {[
+            { id: 'home', label: 'Home' },
+            { id: 'dashboard', label: 'Dashboard' },
+            { id: 'training', label: 'AI Training' },
+            { id: 'catalog', label: 'AI Catalog' }
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => setCurrentView(item.id as any)}
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                border: 'none',
+                borderRadius: '8px',
+                background: currentView === item.id ? theme.accent : 'transparent',
+                color: currentView === item.id ? 'white' : theme.text,
+                textAlign: 'left',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: currentView === item.id ? '500' : '400',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                if (currentView !== item.id) {
+                  e.currentTarget.style.background = theme.surfaceHover;
+                }
+              }}
+              onMouseOut={(e) => {
+                if (currentView !== item.id) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Settings at bottom */}
+        <div style={{
+          paddingTop: '16px',
+          borderTop: `1px solid ${theme.border}`
+        }}>
+          <button
+            onClick={() => setCurrentView('settings')}
+            style={{
+              width: '100%',
+              padding: '10px 16px',
+              border: 'none',
+              borderRadius: '8px',
+              background: currentView === 'settings' ? theme.accent : 'transparent',
+              color: currentView === 'settings' ? 'white' : theme.text,
+              textAlign: 'left',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: currentView === 'settings' ? '500' : '400',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              if (currentView !== 'settings') {
+                e.currentTarget.style.background = theme.surfaceHover;
+              }
+            }}
+            onMouseOut={(e) => {
+              if (currentView !== 'settings') {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            Settings
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div style={{
+        flex: 1,
+        padding: '40px',
+        paddingTop: '60px',
+        overflow: 'auto',
+        background: theme.bg
+      }}>
+        {renderView()}
+      </div>
+    </div>
+  );
+};
+
+// Helper function to format markdown text
+const formatMarkdownText = (text: string, theme: Theme) => {
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  
+  lines.forEach((line, index) => {
+    // Headers
+    if (line.startsWith('**') && line.endsWith('**')) {
+      elements.push(
+        <h4 key={index} style={{
+          margin: '16px 0 8px 0',
+          fontSize: '16px',
+          fontWeight: '600',
+          color: theme.text
+        }}>
+          {line.slice(2, -2)}
+        </h4>
+      );
+    }
+    // Bold text
+    else if (line.includes('**')) {
+      const parts = line.split('**');
+      const formattedLine = parts.map((part, i) => 
+        i % 2 === 1 ? <strong key={i} style={{ color: theme.text }}>{part}</strong> : part
+      );
+      elements.push(<p key={index} style={{ margin: '8px 0', color: theme.text }}>{formattedLine}</p>);
+    }
+    // Bullet points
+    else if (line.startsWith('•') || line.startsWith('-')) {
+      elements.push(
+        <div key={index} style={{
+          margin: '4px 0',
+          paddingLeft: '16px',
+          color: theme.text,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '8px'
+        }}>
+          <span style={{ color: theme.accent, marginTop: '2px' }}>•</span>
+          <span>{line.slice(1).trim()}</span>
+        </div>
+      );
+    }
+    // Numbered lists
+    else if (/^\d+\./.test(line.trim())) {
+      elements.push(
+        <div key={index} style={{
+          margin: '4px 0',
+          paddingLeft: '16px',
+          color: theme.text
+        }}>
+          {line.trim()}
+        </div>
+      );
+    }
+    // Regular paragraphs
+    else if (line.trim()) {
+      elements.push(
+        <p key={index} style={{
+          margin: '8px 0',
+          color: theme.text,
+          lineHeight: '1.5'
+        }}>
+          {line}
+        </p>
+      );
+    }
+    // Empty lines
+    else {
+      elements.push(<br key={index} />);
+    }
+  });
+  
+  return elements;
+};
+
+// Helper function to render response sections
+const renderResponseSections = (response: any, theme: Theme) => {
+  return (
+    <div>
+      {response.tools?.length > 0 && (
+        <div style={{
+          borderTop: `1px solid ${theme.border}`,
+          padding: '16px'
+        }}>
+          <h4 style={{ color: theme.text, marginBottom: '12px', fontWeight: '500' }}>
+            Recommended Tools:
+          </h4>
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {response.tools.map((tool: any, i: number) => (
+              <div key={i} style={{
+                padding: '12px',
+                background: theme.bg,
+                borderRadius: '8px',
+                border: `1px solid ${theme.border}`
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <div>
+                    <h5 style={{ margin: '0 0 4px 0', color: theme.text, fontWeight: '500' }}>
+                      {tool.tool}
+                    </h5>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: theme.textSecondary }}>
+                      {tool.reason}
+                    </p>
+                    <div style={{ fontSize: '12px', color: theme.textSecondary }}>
+                      Best for: {tool.useCases.join(', ')}
+                    </div>
+                  </div>
+                  <a
+                    href={tool.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: theme.accent,
+                      fontSize: '12px',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    Visit →
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {response.training?.length > 0 && (
+        <div style={{
+          borderTop: `1px solid ${theme.border}`,
+          padding: '16px'
+        }}>
+          <h4 style={{ color: theme.text, marginBottom: '12px', fontWeight: '500' }}>
+            Training Resources:
+          </h4>
+          <div style={{ display: 'grid', gap: '8px' }}>
+            {response.training.map((resource: any, i: number) => (
+              <a
+                key={i}
+                href={resource.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: '12px',
+                  background: theme.bg,
+                  borderRadius: '8px',
+                  border: `1px solid ${theme.border}`,
+                  textDecoration: 'none',
+                  color: theme.text,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'transform 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateX(4px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateX(0)';
+                }}
+              >
+                <span style={{ fontWeight: '500' }}>{resource.title}</span>
+                <span style={{ fontSize: '12px', color: theme.textSecondary }}>
+                  {resource.duration} • {resource.level}
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {response.tips?.length > 0 && (
+        <div style={{
+          borderTop: `1px solid ${theme.border}`,
+          padding: '16px'
+        }}>
+          <h4 style={{ color: theme.text, marginBottom: '12px', fontWeight: '500' }}>
+            Pro Tips:
+          </h4>
+          <ul style={{ margin: 0, paddingLeft: '20px' }}>
+            {response.tips.map((tip: string, i: number) => (
+              <li key={i} style={{ color: theme.textSecondary, marginBottom: '6px', fontSize: '14px' }}>
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const HomeView: React.FC<{ userProfile: UserProfile; theme: Theme; damAssistant: SmartDamAssistant }> = ({ 
+  userProfile, 
+  theme, 
+  damAssistant 
+}) => {
+  const [userInput, setUserInput] = useState('');
+  const [conversationMode, setConversationMode] = useState<string | null>(null);
+  const [conversationStep, setConversationStep] = useState(0);
+  const [conversationData, setConversationData] = useState<any>({});
+  const [response, setResponse] = useState<{
+    improvedPrompt?: string;
+    tools: any[];
+    training: any[];
+    tips: string[];
+  } | null>(null);
+  const [chatHistory, setChatHistory] = useState<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+    response?: any;
+  }[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [chatStarted, setChatStarted] = useState(false);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const claudeService = ClaudeAPIService.getInstance();
+
+  const handleQuickAction = (action: string) => {
+    if (action === 'capabilities') {
+      // Special case - just show capabilities
+      setResponse({
+        tools: [],
+        training: [],
+        tips: [],
+        improvedPrompt: `Dam is your AI assistant that helps you become more effective with AI tools. Here's what I can do for you:
+
+• **Prompt Improvement**: I analyze your prompts and suggest better versions that get you more accurate and useful results
+• **Tool Recommendations**: I recommend the best AI tools for your specific tasks based on your role and needs
+• **Training & Learning**: I provide personalized training courses to improve your AI skills
+• **Time Saving**: I help you automate repetitive tasks and find more efficient workflows
+• **Research Assistance**: I can help you research topics, find information, and organize your findings
+
+**Example Use Cases:**
+- "Help me write a better prompt for generating marketing copy"
+- "What's the best AI tool for code review?"
+- "I need to create presentations faster, what AI tools can help?"
+- "Teach me advanced prompt engineering techniques"
+- "How can I use AI to analyze customer feedback?"
+
+Just ask me anything about AI tools, and I'll provide personalized recommendations based on your role and specific needs!`
+      });
+      return;
+    }
+
+    setConversationMode(action);
+    setConversationStep(1);
+    setConversationData({});
+    setUserInput('');
+  };
+
+  const handleConversationResponse = (input: string) => {
+    if (!conversationMode) return;
+
+    const newData = { ...conversationData };
+
+    switch (conversationMode) {
+      case 'planning':
+        if (conversationStep === 1) {
+          newData.role = input;
+          setConversationData(newData);
+          setConversationStep(2);
+          setUserInput('');
+          return;
+        } else if (conversationStep === 2) {
+          newData.project = input;
+          setConversationData(newData);
+          // Generate planning response
+          setResponse({
+            tools: [],
+            training: [],
+            tips: [],
+            improvedPrompt: `Based on your role as ${newData.role} working on "${newData.project}", here's a personalized planning approach:
+
+**Recommended Planning Tools:**
+• **Notion AI** - For project documentation and task management
+• **Miro AI** - For visual planning and brainstorming
+• **Asana Intelligence** - For timeline and resource planning
+
+**Planning Template for ${newData.role}:**
+1. **Define Objectives** - What specific outcomes do you want?
+2. **Break Down Tasks** - What are the key milestones?
+3. **Resource Assessment** - What tools, people, and time do you need?
+4. **Risk Analysis** - What could go wrong and how to mitigate?
+5. **Timeline Creation** - When should each phase be completed?
+
+**AI-Powered Planning Prompts:**
+• "Create a detailed project plan for [project] with timeline and milestones"
+• "What are the potential risks in [project] and how to mitigate them?"
+• "Generate a resource allocation plan for a team of [X] people"
+
+Would you like me to help you create specific prompts for your planning needs?`
+          });
+          setConversationMode(null);
+          setConversationStep(0);
+          return;
+        }
+        break;
+
+      case 'efficiency':
+        if (conversationStep === 1) {
+          newData.role = input;
+          setConversationData(newData);
+          setConversationStep(2);
+          setUserInput('');
+          return;
+        } else if (conversationStep === 2) {
+          newData.timeSpent = input;
+          setConversationData(newData);
+          // Generate efficiency response
+          setResponse({
+            tools: [],
+            training: [],
+            tips: [],
+            improvedPrompt: `As a ${newData.role} who spends a lot of time on "${newData.timeSpent}", here are AI-powered time-saving solutions:
+
+**Time-Saving AI Tools:**
+• **Grammarly AI** - Automated writing assistance and editing
+• **Notion AI** - Auto-generate content, summaries, and templates
+• **GitHub Copilot** - Code auto-completion and generation
+• **Zapier AI** - Workflow automation between apps
+
+**Automation Opportunities for ${newData.role}:**
+1. **Content Creation** - Use AI to draft emails, documents, and reports
+2. **Data Analysis** - Automate data processing and insight generation
+3. **Research** - AI-powered research and information gathering
+4. **Communication** - Auto-generated meeting summaries and action items
+
+**Time-Saving Prompts:**
+• "Create a template for [recurring task] that I can reuse"
+• "Summarize this [document/meeting] and extract key action items"
+• "Generate a workflow to automate [specific process]"
+
+**Estimated Time Savings:** 2-4 hours per week by implementing these AI solutions.
+
+Ready to set up any of these time-saving workflows?`
+          });
+          setConversationMode(null);
+          setConversationStep(0);
+          return;
+        }
+        break;
+
+      case 'research':
+        if (conversationStep === 1) {
+          newData.topic = input;
+          setConversationData(newData);
+          // Generate research response
+          setResponse({
+            tools: [],
+            training: [],
+            tips: [],
+            improvedPrompt: `Research assistance for "${newData.topic}":
+
+**Recommended Research AI Tools:**
+• **Perplexity AI** - Academic and web research with citations
+• **Claude** - Deep analysis and synthesis of complex topics
+• **Consensus** - Scientific research and paper analysis
+• **ChatGPT** - General research and information gathering
+
+**Research Strategy for "${newData.topic}":**
+1. **Initial Overview** - Get a broad understanding of the topic
+2. **Deep Dive** - Focus on specific aspects that matter to you
+3. **Source Verification** - Cross-check information from multiple sources
+4. **Synthesis** - Combine insights into actionable conclusions
+
+**Research Prompts:**
+• "Provide a comprehensive overview of ${newData.topic} including recent developments"
+• "What are the main debates and different perspectives on ${newData.topic}?"
+• "Summarize the key research findings on ${newData.topic} from the last 2 years"
+• "Create a research outline for studying ${newData.topic} in depth"
+
+**Example Research Topics:** 
+- Artificial Intelligence trends 2024
+- Sustainable business practices
+- Remote work productivity strategies
+- Cybersecurity best practices
+
+Would you like me to help you create a detailed research plan for your topic?`
+          });
+          setConversationMode(null);
+          setConversationStep(0);
+          return;
+        }
+        break;
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!userInput.trim() || isLoading) return;
+    
+    setIsLoading(true);
+    setChatStarted(true);
+    
+    // Add user message to chat history
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user' as const,
+      content: userInput,
+      timestamp: new Date()
+    };
+    
+    setChatHistory(prev => [...prev, userMessage]);
+    const currentInput = userInput;
+    setUserInput('');
+    
+    try {
+      if (conversationMode) {
+        handleConversationResponse(currentInput);
+      } else {
+        // Convert chat history to Claude format
+        const claudeHistory = chatHistory.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+        
+        // Get response from Claude
+        const claudeResponse = await claudeService.generateDamResponse(
+          currentInput,
+          claudeHistory,
+          userProfile
+        );
+        
+        // Add assistant response to chat history
+        const assistantMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant' as const,
+          content: claudeResponse,
+          timestamp: new Date()
+        };
+        
+        setChatHistory(prev => [...prev, assistantMessage]);
+        
+        // Scroll to bottom after adding message
+        setTimeout(() => {
+          if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+          }
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error getting Claude response:', error);
+      
+      // Add error message
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: 'I apologize, but I encountered an issue processing your request. Please try again.',
+        timestamp: new Date()
+      };
+      
+      setChatHistory(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getConversationPrompt = () => {
+    if (!conversationMode) return '';
+
+    switch (conversationMode) {
+      case 'planning':
+        if (conversationStep === 1) return "What's your role? (e.g., Product Manager, Software Engineer, Designer)";
+        if (conversationStep === 2) return "Tell me more about what you're working on or planning:";
+        break;
+      case 'efficiency':
+        if (conversationStep === 1) return "What's your role? (e.g., Marketing Manager, Developer, Consultant)";
+        if (conversationStep === 2) return "What tasks do you spend the most time on that you'd like to automate or speed up?";
+        break;
+      case 'research':
+        if (conversationStep === 1) return "What topic would you like to research? (or try: AI trends, climate change, productivity methods)";
+        break;
+    }
+    return '';
+  };
+
+  const recommendations = [
+    {
+      title: "Finding the right AI tool",
+      description: "Get personalized tool recommendations based on your specific needs and workflow",
+      example: "What's the best AI tool for code generation?"
+    },
+    {
+      title: "Rewriting your prompt to be more effective",
+      description: "Transform vague prompts into powerful, specific requests that get better results",
+      example: "Help me improve this prompt: 'help me with code'"
+    },
+    {
+      title: "Finding use-cases based on your role and activity",
+      description: "Discover new ways to use AI in your daily work and boost productivity",
+      example: "What AI tools should a product manager use?"
+    }
+  ];
+
+  return (
+    <div style={{ 
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      maxWidth: '800px', 
+      margin: '0 auto',
+      position: 'relative'
+    }}>
+      {/* Header Section - Only show when chat hasn't started */}
+      {!chatStarted && (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '80px 20px 48px',
+          flex: '0 0 auto'
+        }}>
+          <h1 style={{ 
+            color: theme.text, 
+            marginBottom: '48px',
+            fontSize: '48px',
+            fontWeight: '300',
+            background: 'linear-gradient(45deg, #6366f1, #ec4899)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>
+            {userProfile.name ? `Hello, ${userProfile.name}` : 'Hello, User'}
+          </h1>
+          
+          {/* Quick Action Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'center',
+            marginBottom: '32px',
+            flexWrap: 'wrap'
+          }}>
+            {[
+              { text: 'Tell me what you can do', action: 'capabilities' },
+              { text: 'Help me plan', action: 'planning' },
+              { text: 'Save me time', action: 'efficiency' },
+              { text: 'Research a topic', action: 'research' }
+            ].map((button, index) => (
+              <button
+                key={index}
+                onClick={() => handleQuickAction(button.action)}
+                style={{
+                  padding: '12px 24px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: '24px',
+                  color: theme.text,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  backdropFilter: 'blur(10px)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.borderColor = theme.accent;
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.borderColor = theme.border;
+                }}
+              >
+                {button.text}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Chat Area - Scrollable container for messages */}
+      {chatStarted && (
+        <div 
+          ref={chatContainerRef}
+          style={{
+            flex: '1 1 auto',
+            overflowY: 'auto',
+            padding: '20px',
+            paddingBottom: '120px', // Space for input box
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}
+        >
+          {chatHistory.map((message, index) => (
+            <div key={message.id} style={{
+              display: 'flex',
+              gap: '16px',
+              alignItems: 'flex-start'
+            }}>
+              {/* Avatar */}
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: message.role === 'user' 
+                  ? 'linear-gradient(45deg, #6366f1, #ec4899)'
+                  : theme.accent,
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '14px',
+                fontWeight: '600',
+                flexShrink: 0
+              }}>
+                {message.role === 'user' ? (userProfile.name?.[0] || 'U') : 'D'}
+              </div>
+              
+              {/* Message Content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: '13px',
+                  color: theme.textSecondary,
+                  marginBottom: '6px'
+                }}>
+                  {message.role === 'user' ? (userProfile.name || 'You') : 'Dam'} • {message.timestamp.toLocaleTimeString()}
+                </div>
+                
+                <div style={{
+                  padding: '16px',
+                  background: message.role === 'user' ? theme.surface : theme.surface,
+                  borderRadius: '12px',
+                  border: `1px solid ${theme.border}`,
+                  color: theme.text,
+                  lineHeight: '1.6',
+                  wordWrap: 'break-word'
+                }}>
+                  {message.role === 'assistant' ? 
+                    formatMarkdownText(message.content, theme) : 
+                    message.content
+                  }
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {/* Loading indicator */}
+          {isLoading && (
+            <div style={{
+              display: 'flex',
+              gap: '16px',
+              alignItems: 'flex-start'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: theme.accent,
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                D
+              </div>
+              <div style={{
+                padding: '16px',
+                background: theme.surface,
+                borderRadius: '12px',
+                border: `1px solid ${theme.border}`,
+                color: theme.textSecondary
+              }}>
+                Dam is thinking...
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Input Area - Sticky at bottom when chat started, centered when not */}
+      <div style={{
+        position: chatStarted ? 'fixed' : 'relative',
+        bottom: chatStarted ? '20px' : 'auto',
+        left: chatStarted ? '50%' : 'auto',
+        transform: chatStarted ? 'translateX(-50%)' : 'none',
+        width: chatStarted ? '800px' : '100%',
+        maxWidth: chatStarted ? 'calc(100vw - 40px)' : '100%',
+        zIndex: 1000,
+        background: chatStarted ? theme.bg : 'transparent',
+        padding: chatStarted ? '16px' : '0',
+        borderRadius: chatStarted ? '24px' : '0',
+        border: chatStarted ? `1px solid ${theme.border}` : 'none',
+        boxShadow: chatStarted ? '0 8px 32px rgba(0,0,0,0.1)' : 'none'
+      }}>
+        <div style={{ position: 'relative' }}>
+          <textarea
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
+            placeholder={
+              getConversationPrompt() || 
+              (chatStarted ? "Message Dam..." : "Ask me anything about AI tools and productivity...")
+            }
+            style={{
+              width: '100%',
+              minHeight: '56px',
+              padding: '16px 50px 16px 16px',
+              border: chatStarted ? `1px solid ${theme.border}` : 'none',
+              borderRadius: '16px',
+              fontSize: '16px',
+              fontFamily: 'inherit',
+              resize: 'none',
+              background: chatStarted ? theme.input : 'rgba(255, 255, 255, 0.05)',
+              color: theme.text,
+              outline: 'none',
+              boxSizing: 'border-box'
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            disabled={isLoading}
+          />
+          
+          {/* Send Button */}
+          <button
+            onClick={handleSubmit}
+            disabled={!userInput.trim() || isLoading}
+            style={{
+              position: 'absolute',
+              right: '12px',
+              bottom: '12px',
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: 'none',
+              background: (userInput.trim() && !isLoading) ? theme.accent : 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              cursor: (userInput.trim() && !isLoading) ? 'pointer' : 'not-allowed',
+              fontSize: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {isLoading ? '⋯' : '↑'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+      
+      {/* Chat History */}
+      {chatHistory.length > 0 && (
+        <div style={{ marginTop: '32px' }}>
+          {chatHistory.map((message, index) => (
+            <div key={message.id} style={{
+              marginBottom: '24px',
+              display: 'flex',
+              gap: '16px'
+            }}>
+              {/* Avatar */}
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: message.role === 'user' 
+                  ? 'linear-gradient(45deg, #6366f1, #ec4899)'
+                  : theme.accent,
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '14px',
+                fontWeight: '600',
+                flexShrink: 0
+              }}>
+                {message.role === 'user' ? (userProfile.name?.[0] || 'U') : 'D'}
+              </div>
+              
+              {/* Message Content */}
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontSize: '13px',
+                  color: theme.textSecondary,
+                  marginBottom: '6px'
+                }}>
+                  {message.role === 'user' ? (userProfile.name || 'You') : 'Dam'} • {message.timestamp.toLocaleTimeString()}
+                </div>
+                
+                {message.role === 'user' ? (
+                  <div style={{
+                    padding: '12px 16px',
+                    background: theme.surface,
+                    borderRadius: '12px',
+                    border: `1px solid ${theme.border}`,
+                    color: theme.text,
+                    lineHeight: '1.5'
+                  }}>
+                    {message.content}
+                  </div>
+                ) : (
+                  <div style={{
+                    background: theme.surface,
+                    borderRadius: '12px',
+                    border: `1px solid ${theme.border}`,
+                    overflow: 'hidden'
+                  }}>
+                    {/* Assistant message content with markdown formatting */}
+                    <div style={{
+                      padding: '16px',
+                      color: theme.text,
+                      lineHeight: '1.6'
+                    }}>
+                      {formatMarkdownText(message.content, theme)}
+                    </div>
+                    
+                    {/* Tools, training, and tips sections */}
+                    {message.response && renderResponseSections(message.response, theme)}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {response && !chatHistory.length && (
+        <div style={{
+          marginTop: '32px',
+          background: theme.surface,
+          borderRadius: '12px',
+          border: `1px solid ${theme.border}`,
+          overflow: 'hidden'
+        }}>
+          {response?.improvedPrompt && (
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ color: theme.text, marginBottom: '12px', fontWeight: '500' }}>
+                Improved Prompt:
+              </h4>
+              <div style={{
+                padding: '16px',
+                background: theme.bg,
+                borderRadius: '6px',
+                border: `1px solid ${theme.border}`,
+                fontFamily: 'monospace',
+                fontSize: '13px',
+                color: theme.text,
+                lineHeight: '1.6'
+              }}>
+                {response?.improvedPrompt}
+              </div>
+            </div>
+          )}
+          
+          {response?.tools && response?.tools.length > 0 && (
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ color: theme.text, marginBottom: '12px', fontWeight: '500' }}>
+                Recommended Tools:
+              </h4>
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {response?.tools?.map((tool, i) => (
+                  <div key={i} style={{
+                    padding: '16px',
+                    background: theme.bg,
+                    borderRadius: '6px',
+                    border: `1px solid ${theme.border}`
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div>
+                        <h5 style={{ margin: '0 0 4px 0', color: theme.text, fontWeight: '500' }}>
+                          {tool.tool}
+                        </h5>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: theme.textSecondary }}>
+                          {tool.reason}
+                        </p>
+                        <div style={{ fontSize: '12px', color: theme.textSecondary }}>
+                          Best for: {tool.useCases.join(', ')}
+                        </div>
+                      </div>
+                      <a
+                        href={tool.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: theme.accent,
+                          fontSize: '12px',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        Visit →
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {response?.training && response?.training.length > 0 && (
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ color: theme.text, marginBottom: '12px', fontWeight: '500' }}>
+                Training Resources:
+              </h4>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {response?.training?.map((resource, i) => (
+                  <a
+                    key={i}
+                    href={resource.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '12px',
+                      background: theme.bg,
+                      borderRadius: '6px',
+                      border: `1px solid ${theme.border}`,
+                      textDecoration: 'none',
+                      color: theme.text,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      transition: 'transform 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateX(4px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >
+                    <span style={{ fontWeight: '500' }}>{resource.title}</span>
+                    <span style={{ fontSize: '12px', color: theme.textSecondary }}>
+                      {resource.duration} • {resource.level}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {response?.tips && response?.tips.length > 0 && (
+            <div>
+              <h4 style={{ color: theme.text, marginBottom: '12px', fontWeight: '500' }}>
+                Pro Tips:
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                {response?.tips?.map((tip, i) => (
+                  <li key={i} style={{ color: theme.textSecondary, marginBottom: '6px', fontSize: '14px' }}>
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DashboardView: React.FC<{ theme: Theme }> = ({ theme }) => {
+  const stats = {
+    totalPrompts: 2847,
+    hoursUsed: 156,
+    toolsUsed: 12,
+    topInsights: [
+      "You're in the top 10% of AI power users",
+      "Your prompts are 3x more effective than average",
+      "You've mastered 5 new AI tools this month"
+    ],
+    topCategories: [
+      { name: 'Code Generation', percentage: 42, color: '#6366f1' },
+      { name: 'Writing & Editing', percentage: 28, color: '#8b5cf6' },
+      { name: 'Research & Analysis', percentage: 18, color: '#ec4899' },
+      { name: 'Creative Tasks', percentage: 12, color: '#f59e0b' }
+    ]
+  };
+
+  const startPromptEngineeringCourse = () => {
+    const courseContent = {
+      lessons: [
+        {
+          title: "Introduction to Prompt Engineering",
+          content: `Prompt engineering is the art and science of crafting effective instructions for AI models. A well-designed prompt can dramatically improve the quality and relevance of AI responses.
+
+**Key Principles:**
+1. **Be Specific**: Vague prompts lead to vague responses
+2. **Provide Context**: Give the AI background information
+3. **Set Clear Expectations**: Define the format and style you want
+4. **Use Examples**: Show the AI what good output looks like
+
+**Example:**
+❌ Bad: "Write about marketing"
+✅ Good: "Write a 300-word blog post about email marketing best practices for small businesses, focusing on subject lines, timing, and personalization strategies."`,
+          exercise: "Transform this vague prompt into a specific one: 'Help me with my presentation'"
+        },
+        {
+          title: "Prompt Structure and Components",
+          content: `Effective prompts have a clear structure that guides the AI toward your desired outcome.
+
+**The CRISP Framework:**
+- **C**ontext: Background information
+- **R**ole: Who the AI should act as
+- **I**nstruction: What you want done
+- **S**tyle: How you want it written
+- **P**arameters: Specific constraints or requirements
+
+**Example Prompt:**
+"You are a senior marketing manager (Role) at a SaaS company (Context). Create a 5-point action plan (Instruction) for improving customer retention, written in a professional memo format (Style) with specific metrics and timelines (Parameters)."`,
+          exercise: "Use the CRISP framework to create a prompt for getting help with a work project"
+        }
+      ],
+      quiz: [
+        {
+          question: "What is the most important principle of effective prompt engineering?",
+          options: ["Be specific", "Use complex language", "Keep it short", "Use technical terms"],
+          correct: 0
+        }
+      ]
+    };
+
+    // Create a new window with the course content
+    const courseWindow = window.open('', '_blank', 'width=1000,height=700');
+    if (courseWindow) {
+      courseWindow.document.write(`
+        <html>
+          <head>
+            <title>Advanced Prompt Engineering Course</title>
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                margin: 0;
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                min-height: 100vh;
+              }
+              .course-container {
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+              }
+              .course-header { 
+                text-align: center; 
+                margin-bottom: 40px; 
+                color: white;
+              }
+              .lesson {
+                background: white;
+                border-radius: 12px;
+                padding: 30px;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+              }
+              .lesson h3 {
+                color: #333;
+                margin-top: 0;
+                border-bottom: 2px solid #f5576c;
+                padding-bottom: 10px;
+              }
+              .exercise {
+                background: #f8f9fa;
+                border-left: 4px solid #f5576c;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 0 8px 8px 0;
+              }
+              .exercise-title {
+                font-weight: bold;
+                color: #f5576c;
+                margin-bottom: 8px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="course-container">
+              <div class="course-header">
+                <h1>Advanced Prompt Engineering</h1>
+                <p>Master the art of AI communication</p>
+              </div>
+              
+              ${courseContent.lessons.map((lesson, index) => `
+                <div class="lesson">
+                  <h3>${lesson.title}</h3>
+                  <div style="white-space: pre-line; line-height: 1.6;">${lesson.content}</div>
+                  <div class="exercise">
+                    <div class="exercise-title">💡 Exercise:</div>
+                    ${lesson.exercise}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </body>
+        </html>
+      `);
+      courseWindow.document.close();
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '40px', textAlign: 'center' }}>
+        <h1 style={{ 
+          color: theme.text, 
+          margin: '0 0 16px 0',
+          fontSize: '36px',
+          fontWeight: '700'
+        }}>
+          Dam Insights
+        </h1>
+        <p style={{ 
+          color: theme.textSecondary, 
+          fontSize: '18px',
+          margin: 0 
+        }}>
+          Here's how you've been using AI this month
+        </p>
+      </div>
+
+      {/* Personalized Recommendations - Moved to top */}
+      <div style={{
+        padding: '32px',
+        background: theme.surface,
+        borderRadius: '12px',
+        border: `1px solid ${theme.border}`,
+        marginBottom: '32px'
+      }}>
+        <h2 style={{ 
+          color: theme.text, 
+          marginBottom: '24px',
+          fontSize: '20px',
+          fontWeight: '600'
+        }}>
+          Personalized Recommendations
+        </h2>
+        
+        <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+          {/* New Tool Recommendation */}
+          <div style={{
+            padding: '20px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '12px',
+            color: 'white'
+          }}>
+            <h3 style={{ 
+              margin: '0 0 12px 0',
+              fontSize: '18px',
+              fontWeight: '600'
+            }}>
+              🚀 New Tool Recommendation
+            </h3>
+            <h4 style={{ 
+              margin: '0 0 8px 0',
+              fontSize: '16px',
+              fontWeight: '500'
+            }}>
+              Cursor AI Code Editor
+            </h4>
+            <p style={{ 
+              margin: '0 0 16px 0',
+              fontSize: '14px',
+              opacity: 0.9,
+              lineHeight: '1.4'
+            }}>
+              Based on your coding activity, this AI-powered editor could boost your productivity by 40%. It offers intelligent code completion and debugging assistance.
+            </p>
+            <button 
+              onClick={() => window.open('https://cursor.sh', '_blank')}
+              style={{
+                padding: '8px 16px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '6px',
+                color: 'white',
+                fontSize: '14px',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+            >
+              Try Cursor AI
+            </button>
+          </div>
+
+          {/* New Training Recommendation */}
+          <div style={{
+            padding: '20px',
+            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            borderRadius: '12px',
+            color: 'white'
+          }}>
+            <h3 style={{ 
+              margin: '0 0 12px 0',
+              fontSize: '18px',
+              fontWeight: '600'
+            }}>
+              📚 Recommended Training
+            </h3>
+            <h4 style={{ 
+              margin: '0 0 8px 0',
+              fontSize: '16px',
+              fontWeight: '500'
+            }}>
+              Advanced Prompt Engineering
+            </h4>
+            <p style={{ 
+              margin: '0 0 16px 0',
+              fontSize: '14px',
+              opacity: 0.9,
+              lineHeight: '1.4'
+            }}>
+              Take your prompting skills to the next level. Learn chain-of-thought reasoning, few-shot learning, and optimization techniques.
+            </p>
+            <button 
+              onClick={startPromptEngineeringCourse}
+              style={{
+                padding: '8px 16px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '6px',
+                color: 'white',
+                fontSize: '14px',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+            >
+              Start Course
+            </button>
+          </div>
+        </div>
+
+        {/* Weekly Goal */}
+        <div style={{
+          marginTop: '20px',
+          padding: '16px 20px',
+          background: theme.bg,
+          borderRadius: '8px',
+          border: `1px solid ${theme.border}`
+        }}>
+          <h4 style={{ 
+            color: theme.text,
+            margin: '0 0 8px 0',
+            fontSize: '16px',
+            fontWeight: '500'
+          }}>
+            🎯 This Week's Goal
+          </h4>
+          <p style={{
+            color: theme.textSecondary,
+            margin: 0,
+            fontSize: '14px'
+          }}>
+            Try 2 new AI tools from our catalog to expand your toolkit and discover new workflows.
+          </p>
+        </div>
+      </div>
+
+      {/* Top 3 Insights */}
+      <div style={{
+        padding: '32px',
+        background: theme.surface,
+        borderRadius: '12px',
+        border: `1px solid ${theme.border}`,
+        marginBottom: '32px'
+      }}>
+        <h2 style={{ 
+          color: theme.text, 
+          marginBottom: '24px',
+          fontSize: '20px',
+          fontWeight: '600'
+        }}>
+          Top Insights
+        </h2>
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {stats.topInsights.map((insight, i) => (
+            <div key={i} style={{
+              padding: '16px 20px',
+              background: theme.bg,
+              borderRadius: '8px',
+              border: `1px solid ${theme.border}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: theme.accent,
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: '600',
+                fontSize: '14px'
+              }}>
+                {i + 1}
+              </div>
+              <span style={{ color: theme.text, fontSize: '15px' }}>{insight}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '20px',
+        marginBottom: '32px'
+      }}>
+        {[
+          { title: 'Total Prompts', value: stats.totalPrompts.toLocaleString() },
+          { title: 'Hours Powered by AI', value: stats.hoursUsed.toString() },
+          { title: 'AI Tools Mastered', value: stats.toolsUsed.toString() }
+        ].map((stat, i) => (
+          <div key={i} style={{
+            padding: '24px',
+            background: theme.surface,
+            borderRadius: '8px',
+            border: `1px solid ${theme.border}`,
+            textAlign: 'center'
+          }}>
+            <div style={{ 
+              fontSize: '32px', 
+              fontWeight: '700', 
+              color: theme.accent,
+              marginBottom: '8px'
+            }}>
+              {stat.value}
+            </div>
+            <div style={{ 
+              fontSize: '14px', 
+              color: theme.textSecondary
+            }}>
+              {stat.title}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Categories */}
+      <div style={{
+        padding: '32px',
+        background: theme.surface,
+        borderRadius: '12px',
+        border: `1px solid ${theme.border}`
+      }}>
+        <h2 style={{ 
+          color: theme.text, 
+          marginBottom: '24px',
+          fontSize: '20px',
+          fontWeight: '600'
+        }}>
+          Your AI Usage by Category
+        </h2>
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {stats.topCategories.map((cat, i) => (
+            <div key={i}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                marginBottom: '8px' 
+              }}>
+                <span style={{ color: theme.text, fontWeight: '500' }}>{cat.name}</span>
+                <span style={{ color: theme.textSecondary }}>{cat.percentage}%</span>
+              </div>
+              <div style={{
+                height: '8px',
+                background: theme.bg,
+                borderRadius: '4px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${cat.percentage}%`,
+                  background: cat.color,
+                  transition: 'width 0.5s ease'
+                }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
+const TrainingView: React.FC<{ theme: Theme; damAssistant: SmartDamAssistant }> = ({ theme, damAssistant }) => {
+  const [selectedLevel, setSelectedLevel] = useState<'all' | 'beginner' | 'intermediate' | 'advanced'>('all');
+  const resources = damAssistant.getTrainingResources(selectedLevel, []);
+
+  const getCourseContent = (challengeTitle: string) => {
+    switch (challengeTitle) {
+      case "Prompt Engineering 101":
+        return {
+          lessons: [
+            {
+              title: "Introduction to Prompt Engineering",
+              content: `Prompt engineering is the art and science of crafting effective instructions for AI models. A well-designed prompt can dramatically improve the quality and relevance of AI responses.
+
+**Key Principles:**
+1. **Be Specific**: Vague prompts lead to vague responses
+2. **Provide Context**: Give the AI background information
+3. **Set Clear Expectations**: Define the format and style you want
+4. **Use Examples**: Show the AI what good output looks like
+
+**Example:**
+❌ Bad: "Write about marketing"
+✅ Good: "Write a 300-word blog post about email marketing best practices for small businesses, focusing on subject lines, timing, and personalization strategies."`,
+              exercise: "Transform this vague prompt into a specific one: 'Help me with my presentation'"
+            },
+            {
+              title: "Prompt Structure and Components",
+              content: `Effective prompts have a clear structure that guides the AI toward your desired outcome.
+
+**The CRISP Framework:**
+- **C**ontext: Background information
+- **R**ole: Who the AI should act as
+- **I**nstruction: What you want done
+- **S**tyle: How you want it written
+- **P**arameters: Specific constraints or requirements
+
+**Example Prompt:**
+"You are a senior marketing manager (Role) at a SaaS company (Context). Create a 5-point action plan (Instruction) for improving customer retention, written in a professional memo format (Style) with specific metrics and timelines (Parameters)."`,
+              exercise: "Use the CRISP framework to create a prompt for getting help with a work project"
+            },
+            {
+              title: "Common Prompt Patterns",
+              content: `Learn these powerful prompt patterns that work across different AI models:
+
+**1. Chain of Thought:**
+"Let's think step by step..."
+
+**2. Role Playing:**
+"Act as a [profession/expert]..."
+
+**3. Few-Shot Learning:**
+"Here are some examples: [examples]. Now do the same for..."
+
+**4. Template Filling:**
+"Fill in this template: [template structure]"
+
+**5. Iterative Refinement:**
+"Improve this [content] by focusing on [specific aspects]"
+
+**Practice Examples:**
+- "Act as a UX designer and critique this website layout..."
+- "Let's think step by step about how to solve this coding problem..."
+- "Here are 3 examples of good product descriptions: [examples]. Write one for this product..."`,
+              exercise: "Choose a prompt pattern and create an example for your work scenario"
+            }
+          ],
+          quiz: [
+            {
+              question: "What makes a prompt more effective?",
+              options: ["Being vague to let AI be creative", "Being specific and providing context", "Using complex language", "Making it as short as possible"],
+              correct: 1
+            },
+            {
+              question: "What does the 'R' in CRISP framework stand for?",
+              options: ["Results", "Role", "Requirements", "Resources"],
+              correct: 1
+            }
+          ]
+        };
+      
+      case "Tool Mastery Challenge":
+        return {
+          lessons: [
+            {
+              title: "AI Tool Landscape Overview",
+              content: `Understanding the AI tool ecosystem helps you choose the right tool for each task.
+
+**Categories of AI Tools:**
+
+**🤖 General Conversational AI:**
+- ChatGPT, Claude, Gemini
+- Best for: General questions, brainstorming, writing assistance
+
+**💼 Productivity & Work:**
+- Notion AI, Microsoft Copilot, Grammarly
+- Best for: Document creation, editing, workflow automation
+
+**🎨 Creative Tools:**
+- Midjourney, DALL-E, Runway ML
+- Best for: Image generation, video editing, creative content
+
+**👨‍💻 Developer Tools:**
+- GitHub Copilot, Cursor, Replit AI
+- Best for: Code generation, debugging, documentation
+
+**📊 Data & Analytics:**
+- Tableau AI, DataRobot, H2O.ai
+- Best for: Data analysis, predictive modeling, insights`,
+              exercise: "List 3 tasks you do regularly and identify which AI tool category would help most"
+            },
+            {
+              title: "Tool Selection Strategies",
+              content: `How to choose the right AI tool for your specific needs:
+
+**The MATCH Framework:**
+- **M**ission: What's your goal?
+- **A**udience: Who will use/see the output?
+- **T**ime: How much time do you have?
+- **C**omplexity: How complex is the task?
+- **H**andoff: What happens after AI creates the output?
+
+**Decision Matrix:**
+1. **Quick Text Tasks**: ChatGPT, Claude
+2. **Professional Documents**: Notion AI, Grammarly
+3. **Creative Visuals**: Midjourney, DALL-E
+4. **Code Development**: GitHub Copilot, Cursor
+5. **Research & Analysis**: Perplexity, Claude
+6. **Presentations**: Gamma, Beautiful.ai
+
+**Quality Indicators:**
+✅ Tool specializes in your use case
+✅ Good integration with your workflow
+✅ Reliable uptime and performance
+✅ Strong community and support`,
+              exercise: "Use the MATCH framework to evaluate which tool to use for creating a training presentation"
+            },
+            {
+              title: "Advanced Tool Integration",
+              content: `Maximize efficiency by combining multiple AI tools in workflows:
+
+**Tool Chaining Examples:**
+
+**Content Creation Workflow:**
+1. Claude → Research and outline
+2. ChatGPT → Write first draft  
+3. Grammarly → Edit and polish
+4. Canva AI → Create visuals
+5. Notion AI → Format final document
+
+**Product Development Workflow:**
+1. ChatGPT → Brainstorm features
+2. Cursor → Generate code prototypes
+3. GitHub Copilot → Implement features
+4. Midjourney → Design UI mockups
+5. Claude → Write documentation
+
+**Marketing Campaign Workflow:**
+1. Perplexity → Market research
+2. Claude → Strategy planning
+3. ChatGPT → Copy writing
+4. DALL-E → Visual assets
+5. Notion AI → Campaign timeline
+
+**Integration Tips:**
+- Use consistent terminology across tools
+- Save outputs in standardized formats
+- Create templates for common workflows
+- Document what works for your team`,
+              exercise: "Design a 3-tool workflow for a task you do regularly at work"
+            }
+          ],
+          quiz: [
+            {
+              question: "Which tool category is best for code generation?",
+              options: ["General Conversational AI", "Creative Tools", "Developer Tools", "Data & Analytics"],
+              correct: 2
+            },
+            {
+              question: "What's the first step in the MATCH framework?",
+              options: ["Audience", "Mission", "Time", "Complexity"],
+              correct: 1
+            }
+          ]
+        };
+
+      case "Advanced Prompt Techniques":
+        return {
+          lessons: [
+            {
+              title: "Chain-of-Thought Reasoning",
+              content: `Chain-of-thought prompting helps AI show its reasoning process, leading to more accurate and reliable results.
+
+**Basic Chain-of-Thought:**
+"Let's work through this step by step..."
+
+**Advanced Techniques:**
+
+**1. Explicit Step Breakdown:**
+"To solve this problem, I need to:
+1. First, identify...
+2. Then, analyze...
+3. Next, calculate...
+4. Finally, conclude..."
+
+**2. Self-Questioning:**
+"Before answering, ask yourself:
+- What information do I have?
+- What am I trying to find?
+- What's the logical sequence?
+- Does my answer make sense?"
+
+**3. Multi-Perspective Analysis:**
+"Consider this from multiple angles:
+- Technical perspective: ...
+- Business perspective: ...
+- User perspective: ...
+- Risk perspective: ..."
+
+**Example in Action:**
+❌ Simple: "Is this marketing strategy good?"
+✅ Chain-of-thought: "Evaluate this marketing strategy by: 1) Analyzing the target audience fit, 2) Assessing budget efficiency, 3) Comparing to competitor strategies, 4) Predicting potential ROI, 5) Identifying risks and mitigation strategies. Show your reasoning for each step."`,
+              exercise: "Convert a simple question from your work into a chain-of-thought prompt"
+            },
+            {
+              title: "Few-Shot Learning Mastery",
+              content: `Few-shot learning uses examples to teach AI the pattern you want. It's incredibly powerful for consistent, high-quality outputs.
+
+**Few-Shot Structure:**
+1. **Task Description**: What you want done
+2. **Examples**: 2-5 demonstrations  
+3. **New Input**: What you want processed
+4. **Output Request**: Ask for the result
+
+**Example: Email Response Templates**
+
+"I need professional email responses. Here are examples:
+
+Customer Question: 'When will my order ship?'
+Response: 'Thank you for your inquiry. Your order #12345 is scheduled to ship within 1-2 business days. You'll receive tracking information via email once it's dispatched. Please let me know if you have any other questions.'
+
+Customer Question: 'Can I return this item?'
+Response: 'I'd be happy to help with your return. Items can be returned within 30 days of purchase in original condition. I'll email you a prepaid return label and instructions. The refund will process within 5-7 business days once we receive the item.'
+
+Now respond to: 'I haven't received my refund yet?'"
+
+**Advanced Few-Shot Patterns:**
+- **Progressive Difficulty**: Start simple, increase complexity
+- **Diverse Examples**: Show different scenarios
+- **Error Correction**: Include what NOT to do
+- **Format Consistency**: Maintain style across examples`,
+              exercise: "Create a few-shot prompt for a task you do repeatedly at work"
+            },
+            {
+              title: "Meta-Prompting and Prompt Optimization",
+              content: `Meta-prompting uses AI to improve prompts themselves, creating a powerful feedback loop.
+
+**Meta-Prompt Example:**
+"Analyze this prompt and suggest improvements:
+
+'Write a blog post about AI.'
+
+Consider:
+- Specificity and clarity
+- Target audience definition  
+- Desired outcome clarity
+- Missing context or constraints
+- Structural improvements
+
+Provide a revised version with explanations for each change."
+
+**Prompt Optimization Techniques:**
+
+**1. A/B Testing Prompts:**
+- Create 2-3 variations
+- Test with same inputs
+- Measure quality differences
+- Keep the best performer
+
+**2. Iterative Refinement:**
+- Start with basic prompt
+- Identify weak points in output
+- Add specific constraints
+- Test and refine further
+
+**3. Prompt Debugging:**
+- Break complex prompts into parts
+- Test each component separately
+- Identify which parts cause issues
+- Rebuild systematically
+
+**4. Performance Metrics:**
+- Relevance to goal (1-10)
+- Completeness of response (1-10)
+- Format adherence (1-10)
+- Consistency across runs (1-10)
+
+**Advanced Optimization:**
+- Use AI to generate prompt variations
+- Create prompt libraries for reuse
+- Document what works for different models
+- Build feedback loops with users`,
+              exercise: "Take a prompt you use regularly and optimize it using these techniques"
+            }
+          ],
+          quiz: [
+            {
+              question: "What's the main benefit of chain-of-thought prompting?",
+              options: ["Shorter responses", "Shows reasoning process", "Faster generation", "Uses less tokens"],
+              correct: 1
+            },
+            {
+              question: "How many examples should you typically use in few-shot learning?",
+              options: ["1", "2-5", "10+", "As many as possible"],
+              correct: 1
+            }
+          ]
+        };
+      
+      default:
+        return {
+          lessons: [
+            {
+              title: "Course Content",
+              content: "This course content is being developed. Check back soon for comprehensive training materials!",
+              exercise: "Practice the concepts discussed in this section"
+            }
+          ],
+          quiz: []
+        };
+    }
+  };
+
+  const handleStartChallenge = (challenge: any) => {
+    const courseContent = getCourseContent(challenge.title);
+    
+    // Create a new window with interactive course content
+    const challengeWindow = window.open('', '_blank', 'width=1000,height=700');
+    if (challengeWindow) {
+      challengeWindow.document.write(`
+        <html>
+          <head>
+            <title>${challenge.title}</title>
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+              }
+              .course-container {
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+              }
+              .course-header { 
+                text-align: center; 
+                margin-bottom: 40px; 
+                color: white;
+              }
+              .lesson {
+                background: white;
+                border-radius: 12px;
+                padding: 30px;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+              }
+              .lesson h3 {
+                color: #333;
+                margin-top: 0;
+                border-bottom: 2px solid #667eea;
+                padding-bottom: 10px;
+              }
+              .exercise {
+                background: #f8f9fa;
+                border-left: 4px solid #667eea;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 0 8px 8px 0;
+              }
+              .exercise-title {
+                font-weight: bold;
+                color: #667eea;
+                margin-bottom: 8px;
+              }
+              .quiz {
+                background: #e3f2fd;
+                border-radius: 12px;
+                padding: 20px;
+                margin-top: 20px;
+              }
+              .question {
+                margin-bottom: 20px;
+                padding: 15px;
+                background: white;
+                border-radius: 8px;
+              }
+              .option {
+                display: block;
+                margin: 8px 0;
+                padding: 8px 12px;
+                background: #f5f5f5;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                width: 100%;
+                text-align: left;
+              }
+              .option:hover {
+                background: #e0e0e0;
+              }
+              .option.correct {
+                background: #4caf50 !important;
+                color: white;
+              }
+              .option.incorrect {
+                background: #f44336 !important;
+                color: white;
+              }
+              .progress {
+                background: rgba(255,255,255,0.3);
+                height: 8px;
+                border-radius: 4px;
+                margin: 20px 0;
+                overflow: hidden;
+              }
+              .progress-bar {
+                background: white;
+                height: 100%;
+                border-radius: 4px;
+                transition: width 0.3s ease;
+              }
+              .nav-buttons {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 30px;
+              }
+              .btn {
+                padding: 12px 24px;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: bold;
+                transition: all 0.3s ease;
+              }
+              .btn-primary {
+                background: #667eea;
+                color: white;
+              }
+              .btn-primary:hover {
+                background: #5a6fd8;
+                transform: translateY(-2px);
+              }
+              .btn-secondary {
+                background: rgba(255,255,255,0.2);
+                color: white;
+                border: 1px solid white;
+              }
+              .completion-badge {
+                background: #4caf50;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 14px;
+                font-weight: bold;
+                display: inline-block;
+                margin: 10px 0;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="course-container">
+              <div class="course-header">
+                <h1>${challenge.title}</h1>
+                <p>${challenge.description}</p>
+                <div class="completion-badge">+${challenge.xp} XP Available</div>
+                <div class="progress">
+                  <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+                </div>
+              </div>
+              
+              <div id="courseContent">
+                ${courseContent.lessons.map((lesson, index) => `
+                  <div class="lesson" id="lesson-${index}" style="${index > 0 ? 'display: none;' : ''}">
+                    <h3>${lesson.title}</h3>
+                    <div style="white-space: pre-line; line-height: 1.6;">${lesson.content}</div>
+                    <div class="exercise">
+                      <div class="exercise-title">💡 Exercise:</div>
+                      ${lesson.exercise}
+                    </div>
+                  </div>
+                `).join('')}
+                
+                ${courseContent.quiz.length > 0 ? `
+                  <div class="quiz" id="quiz" style="display: none;">
+                    <h3>🧠 Knowledge Check</h3>
+                    ${courseContent.quiz.map((q, index) => `
+                      <div class="question">
+                        <h4>${q.question}</h4>
+                        ${q.options.map((option, optIndex) => `
+                          <button class="option" onclick="checkAnswer(${index}, ${optIndex}, ${q.correct})">${option}</button>
+                        `).join('')}
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+              
+              <div class="nav-buttons">
+                <button class="btn btn-secondary" onclick="previousStep()" id="prevBtn" style="visibility: hidden;">Previous</button>
+                <button class="btn btn-primary" onclick="nextStep()" id="nextBtn">Next Lesson</button>
+              </div>
+            </div>
+            
+            <script>
+              let currentStep = 0;
+              const totalLessons = ${courseContent.lessons.length};
+              const hasQuiz = ${courseContent.quiz.length > 0};
+              const totalSteps = totalLessons + (hasQuiz ? 1 : 0);
+              let quizCompleted = false;
+              
+              function updateProgress() {
+                const progress = ((currentStep + 1) / totalSteps) * 100;
+                document.getElementById('progressBar').style.width = progress + '%';
+              }
+              
+              function nextStep() {
+                if (currentStep < totalLessons - 1) {
+                  // Next lesson
+                  document.getElementById('lesson-' + currentStep).style.display = 'none';
+                  currentStep++;
+                  document.getElementById('lesson-' + currentStep).style.display = 'block';
+                  document.getElementById('prevBtn').style.visibility = 'visible';
+                  
+                  if (currentStep === totalLessons - 1) {
+                    document.getElementById('nextBtn').textContent = hasQuiz ? 'Take Quiz' : 'Complete Course';
+                  }
+                } else if (hasQuiz && !quizCompleted) {
+                  // Show quiz
+                  document.getElementById('lesson-' + currentStep).style.display = 'none';
+                  document.getElementById('quiz').style.display = 'block';
+                  document.getElementById('nextBtn').textContent = 'Complete Course';
+                  currentStep++;
+                } else {
+                  // Complete course
+                  alert('🎉 Congratulations! You've completed ${challenge.title} and earned +${challenge.xp} XP!\\n\\nKey takeaways from this course have been saved to your Dam learning profile.');
+                  window.close();
+                }
+                updateProgress();
+              }
+              
+              function previousStep() {
+                if (currentStep > 0) {
+                  if (document.getElementById('quiz').style.display === 'block') {
+                    document.getElementById('quiz').style.display = 'none';
+                    currentStep--;
+                    document.getElementById('lesson-' + currentStep).style.display = 'block';
+                    document.getElementById('nextBtn').textContent = 'Take Quiz';
+                  } else {
+                    document.getElementById('lesson-' + currentStep).style.display = 'none';
+                    currentStep--;
+                    document.getElementById('lesson-' + currentStep).style.display = 'block';
+                    document.getElementById('nextBtn').textContent = currentStep === totalLessons - 1 ? (hasQuiz ? 'Take Quiz' : 'Complete Course') : 'Next Lesson';
+                  }
+                  
+                  if (currentStep === 0) {
+                    document.getElementById('prevBtn').style.visibility = 'hidden';
+                  }
+                  updateProgress();
+                }
+              }
+              
+              function checkAnswer(questionIndex, selectedOption, correctOption) {
+                const question = document.querySelectorAll('.question')[questionIndex];
+                const options = question.querySelectorAll('.option');
+                
+                options.forEach((option, index) => {
+                  option.disabled = true;
+                  if (index === correctOption) {
+                    option.classList.add('correct');
+                  } else if (index === selectedOption && index !== correctOption) {
+                    option.classList.add('incorrect');
+                  }
+                });
+                
+                // Check if all questions answered
+                const allQuestions = document.querySelectorAll('.question');
+                let allAnswered = true;
+                allQuestions.forEach(q => {
+                  if (!q.querySelector('.correct, .incorrect')) {
+                    allAnswered = false;
+                  }
+                });
+                
+                if (allAnswered) {
+                  quizCompleted = true;
+                  setTimeout(() => {
+                    alert('Quiz completed! Great job on understanding the key concepts.');
+                  }, 500);
+                }
+              }
+              
+              updateProgress();
+            </script>
+          </body>
+        </html>
+      `);
+    }
+  };
+
+  const challenges = [
+    {
+      title: "Prompt Engineering 101",
+      description: "Master the basics of writing effective prompts",
+      xp: 100,
+      difficulty: "Beginner",
+      color: "#10b981"
+    },
+    {
+      title: "Tool Mastery Challenge",
+      description: "Learn to use 3 different AI tools effectively",
+      xp: 250,
+      difficulty: "Intermediate",
+      color: "#f59e0b"
+    },
+    {
+      title: "Advanced Prompt Techniques",
+      description: "Learn chain-of-thought and few-shot prompting",
+      xp: 500,
+      difficulty: "Advanced",
+      color: "#ef4444"
+    }
+  ];
+
+  return (
+    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <h2 style={{ 
+        color: theme.text, 
+        marginBottom: '32px',
+        fontSize: '28px',
+        fontWeight: '600'
+      }}>
+        AI Training & Resources
+      </h2>
+
+      {/* Level Filter */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {(['all', 'beginner', 'intermediate', 'advanced'] as const).map(level => (
+            <button
+              key={level}
+              onClick={() => setSelectedLevel(level)}
+              style={{
+                padding: '8px 16px',
+                border: `1px solid ${selectedLevel === level ? theme.accent : theme.border}`,
+                background: selectedLevel === level ? theme.accent : 'transparent',
+                color: selectedLevel === level ? 'white' : theme.text,
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                textTransform: 'capitalize',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {level}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Challenges */}
+      <div style={{ marginBottom: '40px' }}>
+        <h3 style={{ 
+          color: theme.text, 
+          marginBottom: '20px',
+          fontSize: '20px',
+          fontWeight: '500'
+        }}>
+          Active Challenges
+        </h3>
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {challenges.map((challenge, i) => (
+            <div key={i} style={{
+              padding: '24px',
+              background: theme.surface,
+              borderRadius: '8px',
+              border: `1px solid ${theme.border}`,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h4 style={{ 
+                  color: theme.text, 
+                  margin: '0 0 4px 0',
+                  fontSize: '16px',
+                  fontWeight: '500'
+                }}>
+                  {challenge.title}
+                </h4>
+                <p style={{ 
+                  color: theme.textSecondary, 
+                  margin: '0 0 8px 0',
+                  fontSize: '14px'
+                }}>
+                  {challenge.description}
+                </p>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <span style={{
+                    padding: '4px 8px',
+                    background: challenge.color + '20',
+                    color: challenge.color,
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: '500'
+                  }}>
+                    {challenge.difficulty}
+                  </span>
+                  <span style={{ color: theme.textSecondary, fontSize: '12px' }}>
+                    +{challenge.xp} XP
+                  </span>
+                </div>
+              </div>
+              <button 
+                onClick={() => handleStartChallenge(challenge)}
+                style={{
+                  padding: '8px 16px',
+                  background: theme.accent,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Start
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Training Resources */}
+      <div>
+        <h3 style={{ 
+          color: theme.text, 
+          marginBottom: '20px',
+          fontSize: '20px',
+          fontWeight: '500'
+        }}>
+          Training Resources
+        </h3>
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {resources.map((resource, i) => (
+            <a
+              key={i}
+              href={resource.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                padding: '16px',
+                background: theme.surface,
+                borderRadius: '8px',
+                border: `1px solid ${theme.border}`,
+                textDecoration: 'none',
+                color: 'inherit',
+                display: 'block',
+                transition: 'transform 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateX(4px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateX(0)';
+              }}
+            >
+              <h4 style={{ 
+                color: theme.text, 
+                margin: '0 0 4px 0',
+                fontSize: '15px',
+                fontWeight: '500'
+              }}>
+                {resource.title}
+              </h4>
+              <div style={{ 
+                display: 'flex', 
+                gap: '12px', 
+                fontSize: '13px',
+                color: theme.textSecondary 
+              }}>
+                <span>{resource.duration}</span>
+                <span>•</span>
+                <span style={{ textTransform: 'capitalize' }}>{resource.level}</span>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CatalogView: React.FC<{ theme: Theme; damAssistant: SmartDamAssistant }> = ({ theme, damAssistant }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const tools = damAssistant.recommendTools(searchQuery || 'general tasks', '');
+
+  const allTools = [
+    { name: 'ChatGPT', category: 'General', status: 'installed', users: 1234, url: 'https://chat.openai.com', tags: ['Popular', 'Engineering', 'Marketing'] },
+    { name: 'Claude', category: 'Analysis', status: 'installed', users: 892, url: 'https://claude.ai', tags: ['Recommended', 'Engineering', 'Analysis'] },
+    { name: 'GitHub Copilot', category: 'Development', status: 'available', users: 567, url: 'https://github.com/features/copilot', tags: ['Popular', 'Engineering', 'Coding'] },
+    { name: 'Perplexity', category: 'Research', status: 'available', users: 445, url: 'https://perplexity.ai', tags: ['New', 'Research', 'Marketing'] },
+    { name: 'Midjourney', category: 'Design', status: 'recommended', users: 334, url: 'https://midjourney.com', tags: ['Popular', 'Design', 'Creative'] },
+    { name: 'DALL-E', category: 'Design', status: 'available', users: 289, url: 'https://openai.com/dall-e-2', tags: ['Recommended', 'Design', 'Creative'] },
+    { name: 'Notion AI', category: 'Productivity', status: 'installed', users: 412, url: 'https://notion.so', tags: ['Popular', 'Productivity', 'Marketing'] },
+    { name: 'Grammarly', category: 'Writing', status: 'available', users: 678, url: 'https://grammarly.com', tags: ['Popular', 'Writing', 'Marketing'] }
+  ];
+
+  const handleOpenTool = (tool: any) => {
+    // Open the tool URL in the user's default browser
+    window.open(tool.url, '_blank');
+  };
+
+  return (
+    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '32px'
+      }}>
+        <h2 style={{ 
+          color: theme.text, 
+          margin: 0,
+          fontSize: '28px',
+          fontWeight: '600'
+        }}>
+          AI Tools Catalog
+        </h2>
+        <button
+          disabled
+          style={{
+            padding: '10px 20px',
+            background: theme.textSecondary,
+            color: 'rgba(255, 255, 255, 0.6)',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'not-allowed',
+            fontSize: '14px',
+            fontWeight: '500',
+            opacity: 0.6
+          }}
+        >
+          Request New Tool
+        </button>
+      </div>
+
+      {/* Search */}
+      <div style={{ marginBottom: '32px' }}>
+        <input
+          type="text"
+          placeholder="Search tools or describe your task..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: 'calc(100% - 40px)',
+            padding: '12px 16px',
+            margin: '8px 0',
+            border: `1px solid ${theme.inputBorder}`,
+            borderRadius: '6px',
+            fontSize: '14px',
+            background: theme.input,
+            color: theme.text,
+            outline: 'none',
+            boxSizing: 'border-box'
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = theme.accent;
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = theme.inputBorder;
+          }}
+        />
+      </div>
+
+      {/* Recommended Based on Search */}
+      {searchQuery && tools.length > 0 && (
+        <div style={{ marginBottom: '32px' }}>
+          <h3 style={{ 
+            color: theme.text, 
+            marginBottom: '16px',
+            fontSize: '18px',
+            fontWeight: '500'
+          }}>
+            Recommended for "{searchQuery}"
+          </h3>
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {tools.map((tool, i) => (
+              <div key={i} style={{
+                padding: '16px',
+                background: theme.surface,
+                borderRadius: '8px',
+                border: `1px solid ${theme.border}`
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', color: theme.text }}>
+                      {tool.tool}
+                    </h4>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: theme.textSecondary }}>
+                      {tool.reason}
+                    </p>
+                  </div>
+                  <a
+                    href={tool.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: theme.accent,
+                      fontSize: '13px',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    Learn More →
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All Tools */}
+      <div>
+        <h3 style={{ 
+          color: theme.text, 
+          marginBottom: '16px',
+          fontSize: '18px',
+          fontWeight: '500'
+        }}>
+          Available Tools
+        </h3>
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {allTools.map((tool, i) => (
+            <div key={i} style={{
+              padding: '16px',
+              background: theme.surface,
+              borderRadius: '8px',
+              border: `1px solid ${theme.border}`,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h4 style={{ 
+                  color: theme.text, 
+                  margin: '0 0 4px 0',
+                  fontSize: '15px',
+                  fontWeight: '500'
+                }}>
+                  {tool.name}
+                </h4>
+                <div style={{ display: 'flex', gap: '12px', fontSize: '13px', color: theme.textSecondary, marginBottom: '8px' }}>
+                  <span>{tool.category}</span>
+                  <span>•</span>
+                  <span>{tool.users} users</span>
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {tool.tags.map((tag: string, index: number) => (
+                    <span
+                      key={index}
+                      style={{
+                        padding: '2px 8px',
+                        background: tag === 'Popular' ? '#10b981' : 
+                                   tag === 'New' ? '#3b82f6' :
+                                   tag === 'Recommended' ? '#f59e0b' :
+                                   tag === 'Design' ? '#ec4899' :
+                                   tag === 'Engineering' ? '#8b5cf6' :
+                                   tag === 'Marketing' ? '#ef4444' :
+                                   theme.accent,
+                        color: 'white',
+                        borderRadius: '12px',
+                        fontSize: '10px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => handleOpenTool(tool)}
+                style={{
+                  padding: '8px 16px',
+                  background: theme.accent,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  transition: 'background 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = theme.accentHover;
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = theme.accent;
+                }}
+              >
+                Open
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SettingsView: React.FC<{ 
+  userProfile: UserProfile; 
+  onSave: (profile: UserProfile) => void; 
+  theme: Theme;
+  darkMode: boolean;
+  toggleTheme: () => void;
+}> = ({ userProfile, onSave, theme, darkMode, toggleTheme }) => {
+  const [profile, setProfile] = useState(userProfile);
+
+  const handleSave = () => {
+    onSave(profile);
+  };
+
+  const roles = ['Developer', 'Designer', 'Product Manager', 'Writer', 'Researcher', 'Other'];
+
+  return (
+    <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <h2 style={{ 
+        color: theme.text, 
+        marginBottom: '32px',
+        fontSize: '28px',
+        fontWeight: '600'
+      }}>
+        Settings
+      </h2>
+
+      {/* Profile Settings */}
+      <div style={{
+        padding: '24px',
+        background: theme.surface,
+        borderRadius: '8px',
+        border: `1px solid ${theme.border}`,
+        marginBottom: '24px'
+      }}>
+        <h3 style={{ 
+          color: theme.text, 
+          marginBottom: '20px',
+          fontSize: '18px',
+          fontWeight: '500'
+        }}>
+          Profile Information
+        </h3>
+        
+        <div style={{ display: 'grid', gap: '16px' }}>
+          <div>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '6px', 
+              fontSize: '14px',
+              color: theme.textSecondary 
+            }}>
+              Name
+            </label>
+            <input
+              type="text"
+              value={profile.name}
+              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+              style={{
+                width: 'calc(100% - 40px)',
+                padding: '12px 16px',
+                margin: '8px 0',
+                border: `1px solid ${theme.inputBorder}`,
+                borderRadius: '6px',
+                fontSize: '14px',
+                background: theme.input,
+                color: theme.text,
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.accent;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = theme.inputBorder;
+              }}
+            />
+          </div>
+          
+          <div>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '6px', 
+              fontSize: '14px',
+              color: theme.textSecondary 
+            }}>
+              Email
+            </label>
+            <input
+              type="email"
+              value={profile.email}
+              onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+              style={{
+                width: 'calc(100% - 40px)',
+                padding: '12px 16px',
+                margin: '8px 0',
+                border: `1px solid ${theme.inputBorder}`,
+                borderRadius: '6px',
+                fontSize: '14px',
+                background: theme.input,
+                color: theme.text,
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.accent;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = theme.inputBorder;
+              }}
+            />
+          </div>
+          
+          <div>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '6px', 
+              fontSize: '14px',
+              color: theme.textSecondary 
+            }}>
+              Role
+            </label>
+            <select
+              value={profile.role}
+              onChange={(e) => setProfile({ ...profile, role: e.target.value })}
+              style={{
+                width: 'calc(100% - 40px)',
+                padding: '12px 16px',
+                margin: '8px 0',
+                border: `1px solid ${theme.inputBorder}`,
+                borderRadius: '6px',
+                fontSize: '14px',
+                background: theme.input,
+                color: theme.text,
+                outline: 'none',
+                cursor: 'pointer',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.accent;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = theme.inputBorder;
+              }}
+            >
+              <option value="">Select a role</option>
+              {roles.map(role => (
+                <option key={role} value={role.toLowerCase()}>{role}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '6px', 
+              fontSize: '14px',
+              color: theme.textSecondary 
+            }}>
+              Dam Enterprise URL
+            </label>
+            <input
+              type="url"
+              value={profile.enterpriseUrl}
+              onChange={(e) => setProfile({ ...profile, enterpriseUrl: e.target.value })}
+              placeholder="https://your-company.dam.ai"
+              style={{
+                width: 'calc(100% - 40px)',
+                padding: '12px 16px',
+                margin: '8px 0',
+                border: `1px solid ${theme.inputBorder}`,
+                borderRadius: '6px',
+                fontSize: '14px',
+                background: theme.input,
+                color: theme.text,
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.accent;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = theme.inputBorder;
+              }}
+            />
+          </div>
+        </div>
+        
+        <button
+          onClick={handleSave}
+          style={{
+            marginTop: '20px',
+            padding: '10px 20px',
+            background: theme.accent,
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'background 0.2s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = theme.accentHover;
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = theme.accent;
+          }}
+        >
+          Save Profile
+        </button>
+      </div>
+
+      {/* Appearance */}
+      <div style={{
+        padding: '24px',
+        background: theme.surface,
+        borderRadius: '8px',
+        border: `1px solid ${theme.border}`,
+        marginBottom: '24px'
+      }}>
+        <h3 style={{ 
+          color: theme.text, 
+          marginBottom: '20px',
+          fontSize: '18px',
+          fontWeight: '500'
+        }}>
+          Appearance
+        </h3>
+        
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <div style={{ color: theme.text, fontWeight: '500', marginBottom: '4px' }}>
+              Theme
+            </div>
+            <div style={{ color: theme.textSecondary, fontSize: '13px' }}>
+              {darkMode ? 'Dark mode' : 'Light mode'} is currently active
+            </div>
+          </div>
+          <button
+            onClick={toggleTheme}
+            style={{
+              padding: '8px 16px',
+              background: theme.surfaceHover,
+              color: theme.text,
+              border: `1px solid ${theme.border}`,
+              borderRadius: '6px',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = theme.accent;
+              e.currentTarget.style.color = 'white';
+              e.currentTarget.style.borderColor = theme.accent;
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = theme.surfaceHover;
+              e.currentTarget.style.color = theme.text;
+              e.currentTarget.style.borderColor = theme.border;
+            }}
+          >
+            {darkMode ? 'Switch to Light' : 'Switch to Dark'}
+          </button>
+        </div>
+      </div>
+
+      {/* Notification Settings */}
+      <div style={{
+        padding: '24px',
+        background: theme.surface,
+        borderRadius: '8px',
+        border: `1px solid ${theme.border}`,
+        marginBottom: '24px'
+      }}>
+        <h3 style={{ 
+          color: theme.text, 
+          marginBottom: '20px',
+          fontSize: '18px',
+          fontWeight: '500'
+        }}>
+          Notification Preferences
+        </h3>
+        
+        <div style={{ display: 'grid', gap: '16px' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            padding: '8px 0',
+            borderBottom: `1px solid ${theme.border}`
+          }}>
+            <div>
+              <div style={{ color: theme.text, fontWeight: '500' }}>Critical Security Alerts</div>
+              <div style={{ color: theme.textSecondary, fontSize: '13px' }}>
+                Warnings about sensitive data sharing
+              </div>
+            </div>
+            <input 
+              type="checkbox" 
+              defaultChecked 
+              style={{ width: '18px', height: '18px' }}
+            />
+          </div>
+          
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            padding: '8px 0',
+            borderBottom: `1px solid ${theme.border}`
+          }}>
+            <div>
+              <div style={{ color: theme.text, fontWeight: '500' }}>Prompt Suggestions</div>
+              <div style={{ color: theme.textSecondary, fontSize: '13px' }}>
+                Tips to improve your AI prompts
+              </div>
+            </div>
+            <input 
+              type="checkbox" 
+              style={{ width: '18px', height: '18px' }}
+            />
+          </div>
+          
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            padding: '8px 0',
+            borderBottom: `1px solid ${theme.border}`
+          }}>
+            <div>
+              <div style={{ color: theme.text, fontWeight: '500' }}>Learning Tips</div>
+              <div style={{ color: theme.textSecondary, fontSize: '13px' }}>
+                Educational content and skill development
+              </div>
+            </div>
+            <input 
+              type="checkbox" 
+              style={{ width: '18px', height: '18px' }}
+            />
+          </div>
+          
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            padding: '8px 0'
+          }}>
+            <div>
+              <div style={{ color: theme.text, fontWeight: '500' }}>Notification Frequency</div>
+              <div style={{ color: theme.textSecondary, fontSize: '13px' }}>
+                How often to show non-critical notifications
+              </div>
+            </div>
+            <select
+              defaultValue="minimal"
+              style={{
+                padding: '6px 10px',
+                border: `1px solid ${theme.inputBorder}`,
+                borderRadius: '4px',
+                background: theme.input,
+                color: theme.text,
+                fontSize: '13px'
+              }}
+            >
+              <option value="all">All notifications</option>
+              <option value="occasional">Occasional</option>
+              <option value="minimal">Minimal only</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* About */}
+      <div style={{
+        padding: '24px',
+        background: theme.surface,
+        borderRadius: '8px',
+        border: `1px solid ${theme.border}`
+      }}>
+        <h3 style={{ 
+          color: theme.text, 
+          marginBottom: '16px',
+          fontSize: '18px',
+          fontWeight: '500'
+        }}>
+          About Dam Desktop
+        </h3>
+        <p style={{ 
+          color: theme.textSecondary, 
+          fontSize: '14px',
+          lineHeight: '1.6',
+          margin: '0 0 12px 0'
+        }}>
+          Dam Desktop helps you become an AI power user with intelligent prompt improvements, 
+          personalized tool recommendations, and skill development resources.
+        </p>
+        <div style={{ 
+          fontSize: '13px', 
+          color: theme.textSecondary 
+        }}>
+          Version 1.0.0
+        </div>
+      </div>
+    </div>
+  );
+};

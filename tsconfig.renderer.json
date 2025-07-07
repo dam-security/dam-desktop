@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "target": "ES2020",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/renderer/**/*",
+    "src/common/**/*"
+  ],
+  "typeRoots": ["./src/renderer/types", "./node_modules/@types"],
+  "exclude": [
+    "src/main/**/*",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
+}
